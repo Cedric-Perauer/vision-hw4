@@ -15,18 +15,37 @@ void activate_matrix(matrix m, ACTIVATION a)
         for(j = 0; j < m.cols; ++j){
             double x = m.data[i][j];
             if(a == LOGISTIC){
-                // TODO
+                m.data[i][j] = 1.0/(1 + exp(-x));
             } else if (a == RELU){
-                // TODO
+                if(x < 0)
+                {
+                    m.data[i][j] = 0; 
+                }
+                else
+                {
+                    m.data[i][j] = x; 
+                }
+                
             } else if (a == LRELU){
-                // TODO
+                if(x < 0)
+                {
+                    m.data[i][j] = x * 0.01; 
+                }
+                else
+                {
+                    m.data[i][j] = x; 
+                }
+                
             } else if (a == SOFTMAX){
-                // TODO
+                m.data[i][j] = exp(x);
+                
             }
             sum += m.data[i][j];
         }
         if (a == SOFTMAX) {
-            // TODO: have to normalize by sum if we are using SOFTMAX
+             for(int y = 0; y < m.cols; ++y){
+             m.data[i][y] /= sum; 
+             }
         }
     }
 }
@@ -42,7 +61,32 @@ void gradient_matrix(matrix m, ACTIVATION a, matrix d)
     for(i = 0; i < m.rows; ++i){
         for(j = 0; j < m.cols; ++j){
             double x = m.data[i][j];
-            // TODO: multiply the correct element of d by the gradient
+            double gradient;
+             if(a == LOGISTIC){
+                d.data[i][j] *= x * (1-x);
+            } else if (a == RELU){
+                if(x < 0)
+                {
+                    d.data[i][j] *= 0; 
+                }
+                else
+                {
+                    d.data[i][j] *= 1; 
+                }
+                
+            } else if (a == LRELU){
+                if(x < 0)
+                {
+                    d.data[i][j] *= 0.01; 
+                }
+                else
+                {
+                    d.data[i][j] *= 1; 
+                }
+                
+            } else if (a == SOFTMAX || a == LINEAR){
+                d.data[i][j] *= 1;
+            }
         }
     }
 }
@@ -55,10 +99,11 @@ matrix forward_layer(layer *l, matrix in)
 {
 
     l->in = in;  // Save the input for backpropagation
-
+    ACTIVATION activate = l->activation; 
 
     // TODO: fix this! multiply input by weights and apply activation function.
-    matrix out = make_matrix(in.rows, l->w.cols);
+    matrix out = matrix_mult_matrix(in, l->w);
+    activate_matrix(out,activate); 
 
 
     free_matrix(l->out);// free the old output
@@ -75,18 +120,18 @@ matrix backward_layer(layer *l, matrix delta)
     // 1.4.1
     // delta is dL/dy
     // TODO: modify it in place to be dL/d(xw)
-
+    gradient_matrix(l->out,l->activation,delta); 
 
     // 1.4.2
     // TODO: then calculate dL/dw and save it in l->dw
     free_matrix(l->dw);
-    matrix dw = make_matrix(l->w.rows, l->w.cols); // replace this
+    matrix dw = matrix_mult_matrix(transpose_matrix(l->in), delta); // replace this
     l->dw = dw;
 
     
     // 1.4.3
     // TODO: finally, calculate dL/dx and return it.
-    matrix dx = make_matrix(l->in.rows, l->in.cols); // replace this
+    matrix dx = matrix_mult_matrix(delta, transpose_matrix(l->w)); // replace this
 
     return dx;
 }
@@ -101,12 +146,18 @@ void update_layer(layer *l, double rate, double momentum, double decay)
     // TODO:
     // Calculate Δw_t = dL/dw_t - λw_t + mΔw_{t-1}
     // save it to l->v
-
-
+    
+    matrix new_w = axpy_matrix(-decay,l->w,l->dw); //dL/dw_t - λw_t
+    matrix dwt = axpy_matrix(momentum,l->v,new_w); //dL/dw_t - λw_t + mΔw_{t-1}
+    free_matrix(l->v); 
+    l->v = new_w; 
     // Update l->w
+    matrix w_t1 = axpy_matrix(rate,l->v,l->w); //w_{t+1} = w_t + ηΔw_t
+    free_matrix(l->w);
+    l->w = w_t1;    
 
-
-    // Remember to free any intermediate results to avoid memory leaks
+  
+  
 
 }
 
